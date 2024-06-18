@@ -520,7 +520,6 @@ def _calculate_of(data_instance,
     prev_frame = np.ascontiguousarray(prev_frame)
     next_frame = np.ascontiguousarray(next_frame)
     
-    print(prev_frame.dtype, prev_frame.shape, next_frame.shape)
     # calculate dense flow
     if method == "Farneback":
         of_instance = cv2.optflow.createOptFlow_Farneback()
