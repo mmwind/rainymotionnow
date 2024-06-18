@@ -396,6 +396,8 @@ class SparseSD:
         self.inverse_scaler = inv_RYScaler
 
         self.lead_steps = 12
+        
+        self.additional_params = {}
 
     def run(self):
         """
@@ -501,8 +503,10 @@ def _fill_holes(of_instance, threshold=0):
 # calculate optical flow
 def _calculate_of(data_instance,
                   method="DIS",
-                  direction="forward"):
-
+                  direction="forward",
+                  additional_params=None):
+    if additional_params is None:
+        additional_params = {}
     # define frames order
     if direction == "forward":
         prev_frame = data_instance[-2]
@@ -512,12 +516,16 @@ def _calculate_of(data_instance,
         prev_frame = data_instance[-1]
         next_frame = data_instance[-2]
         coef = -1.0
-
+    # Convert to contiguous array to correctly call C code inside OpenCV
+    prev_frame = np.ascontiguousarray(prev_frame)
+    next_frame = np.ascontiguousarray(next_frame)
+    
     # calculate dense flow
     if method == "Farneback":
         of_instance = cv2.optflow.createOptFlow_Farneback()
     elif method == "DIS":
-        of_instance = cv2.optflow.createOptFlow_DIS()
+        dis_preset = additional_params.get("DIS_preset",cv2.DISOPTICAL_FLOW_PRESET_FAST)
+        of_instance = cv2.DISOpticalFlow().create(preset=dis_preset) # Specify preset
     elif method == "DeepFlow":
         of_instance = cv2.optflow.createOptFlow_DeepFlow()
     elif method == "PCAFlow":
