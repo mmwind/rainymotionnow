@@ -247,6 +247,10 @@ class Sparse:
         self.inverse_scaler = inv_RYScaler
 
         self.lead_steps = 12
+        
+        self.joint_input = None
+        
+        self.frame_callback = None
 
     def run(self):
         """
@@ -286,9 +290,11 @@ class Sparse:
         # container for our nowcasts
         last_frame = data_scaled[-1]
         nowcst_frames = []
+        nowcst_joint_frames = []
 
         for lead_step, pts_target in enumerate(pts_target_container):
-
+            if self.frame_callback is not None:
+                self.frame_callback(lead_step)
             # estimate transformation matrix
             # based on source and traget points
             trf.estimate(pts_source, pts_target)
@@ -299,12 +305,24 @@ class Sparse:
             nowcst_frame = (nowcst_frame*255).astype('uint8')
             # add to the container
             nowcst_frames.append(nowcst_frame)
+            
+            # Repeat for joint input (say precepitation types)
+            if self.joint_input is not None:
+                    #last_joint_frame_max = last_joint_frame.max()
+                    # make a nowcast
+                    nowcst_joint_frame = sktf.warp(self.joint_input, trf.inverse, order=0, preserve_range=True, mode='edge')
+                    # transformations dealing with strange behaviour
+                    # nowcst_joint_frame = (nowcst_joint_frame*last_joint_frame_max)
+                    # add to the container
+                    nowcst_joint_frames.append(nowcst_joint_frame)
 
         nowcst_frames = np.stack(nowcst_frames, axis=0)
-
         nowcst_frames = self.inverse_scaler(nowcst_frames, c1, c2)
-
-        return nowcst_frames
+        if self.__getattribute__("joint_input") is not None:
+            nowcst_joint_frames = np.stack(nowcst_joint_frames, axis=0)
+            return nowcst_frames, nowcst_joint_frames
+        else:
+            return nowcst_frames
 
 
 class SparseSD:
@@ -516,6 +534,7 @@ def _calculate_of(data_instance,
         prev_frame = data_instance[-1]
         next_frame = data_instance[-2]
         coef = -1.0
+    
     # Convert to contiguous array to correctly call C code inside OpenCV
     prev_frame = np.ascontiguousarray(prev_frame)
     next_frame = np.ascontiguousarray(next_frame)
@@ -707,6 +726,8 @@ class Dense:
         self.input_data = None
 
         self.scaler = RYScaler
+        
+        self.inv_scaler = inv_RYScaler
 
         self.lead_steps = 12
 
@@ -751,9 +772,11 @@ class Dense:
                                           method=self.interpolation))
 
         # reshaping
+
         nowcasts = np.moveaxis(np.dstack(nowcasts), -1, 0)
 
-        return nowcasts
+        nowcasts_output = self.inv_scaler(nowcasts, c1, c2)
+        return nowcasts_output
 
 
 class DenseRotation:
